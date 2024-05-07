@@ -1,0 +1,86 @@
+networks:
+  local:
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/log:/var/log/nginx
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+      - ./storages:/go/storages
+      - ./public:/go/public
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    depends_on:
+      - api
+    networks:
+      - local
+
+  api:
+    image: komgrip/bma-ams-api-service:latest
+    container_name: api
+    restart: always
+    volumes:
+      - ./storages:/go/src/gitlab.com/bma-ams-api-service/storages
+      - ./public:/go/src/gitlab.com/bma-ams-api-service/public
+    networks:
+      - local
+
+  prepare-data:
+    image: komgrip/bma-ams-prepare-data-service:latest
+    container_name: prepare-data
+    restart: always
+    volumes:
+      - ./storages:/go/src/gitlab.com/bma-ams-api-service/storages
+      - ./public:/go/src/gitlab.com/bma-ams-api-service/public
+    networks:
+      - local
+
+  traffy-fondue:
+    image: komgrip/bma-ams-traffy-fondue:latest
+    container_name: traffy-fondue
+    restart: always
+    volumes:
+      - ./storages/traffy-fondue:/go/src/gitlab.com/bma-ams-traffy-fondue/storages
+     # - ./public:/go/src/gitlab.com/bma-ams-traffy-fondue/public
+    networks:
+      - local
+
+  traffy-fondue-ifp:
+    image: komgrip/bma-ams-traffy-fondue-ifp:latest
+    container_name: traffy-fondue-ifp
+    restart: always
+    #volumes:
+     # - ./storages/traffy-fondue:/go/src/gitlab.com/bma-ams-traffy-fondue/stora>
+     # - ./public:/go/src/gitlab.com/bma-ams-traffy-fondue/public
+    networks:
+      - local
+
+  model-service:
+    image: komgrip/bma-ams-model-service:latest
+    container_name: model-service
+    restart: always
+   # ports:
+   #   - "8000:8000"
+    networks:
+      - local
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    restart: unless-stopped
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;"
+    depends_on:
+      - nginx
+    networks:
+      - local
